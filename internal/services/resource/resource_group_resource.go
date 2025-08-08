@@ -174,6 +174,15 @@ var client resources.GroupsClient
 
 func resourceResourceGroupRead(d *pluginsdk.ResourceData, meta interface{}) error {
 	client := meta.(*clients.Client).Resource.GroupsClient
+	subIDRaw, hasSubID := d.GetOk("subscription_id")
+	if hasSubID && subIDRaw.(string) != "" {
+		azClient := meta.(*clients.Client)
+		client = resources.NewGroupsClient(subIDRaw.(string))
+		client.Authorizer = azClient.Resource.GroupsClient.Authorizer
+		client.Client = azClient.Resource.GroupsClient.Client
+	} else {
+		client = *meta.(*clients.Client).Resource.GroupsClient
+	}
 	ctx, cancel := timeouts.ForRead(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
