@@ -71,9 +71,9 @@ func resourceResourceGroupCreateUpdate(d *pluginsdk.ResourceData, meta interface
  if hasSubID && subIDRaw.(string) != "" {
 	 // Crée un client spécifique pour la souscription demandée
 	 azClient := meta.(*clients.Client)
-	 client = resources.NewGroupsClient(subIDRaw.(string))
-	 client.Authorizer = azClient.Resource.GroupsClient.Authorizer
-	 client.Client = azClient.Resource.GroupsClient.Client
+	client = &resources.NewGroupsClient(subIDRaw.(string))
+	client.Authorizer = azClient.Resource.GroupsClient.Authorizer
+	client.Client = azClient.Resource.GroupsClient.Client
  } else {
 	 client = meta.(*clients.Client).Resource.GroupsClient
  }
@@ -200,7 +200,7 @@ func resourceResourceGroupRead(d *pluginsdk.ResourceData, meta interface{}) erro
 	if resp.ID != nil {
 		parsedId, err := parse.ResourceGroupIDInsensitively(*resp.ID)
 		if err == nil {
-			d.Set("subscription_id", parsedId.SubscriptionId())
+		 d.Set("subscription_id", parsedId.SubscriptionId)
 		}
 	}
 	return tags.FlattenAndSet(d, resp.Tags)
