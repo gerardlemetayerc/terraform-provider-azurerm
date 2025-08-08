@@ -66,16 +66,16 @@ func resourceResourceGroup() *pluginsdk.Resource {
 }
 
 func resourceResourceGroupCreateUpdate(d *pluginsdk.ResourceData, meta interface{}) error {
- var client resources.GroupsClient
+var client resources.GroupsClient
  subIDRaw, hasSubID := d.GetOk("subscription_id")
  if hasSubID && subIDRaw.(string) != "" {
-	 // Crée un client spécifique pour la souscription demandée
-	 azClient := meta.(*clients.Client)
-	client = &resources.NewGroupsClient(subIDRaw.(string))
+	// Crée un client spécifique pour la souscription demandée
+	azClient := meta.(*clients.Client)
+	client = resources.NewGroupsClient(subIDRaw.(string))
 	client.Authorizer = azClient.Resource.GroupsClient.Authorizer
 	client.Client = azClient.Resource.GroupsClient.Client
  } else {
-	 client = meta.(*clients.Client).Resource.GroupsClient
+ client = *meta.(*clients.Client).Resource.GroupsClient
  }
 	ctx, cancel := timeouts.ForCreateUpdate(meta.(*clients.Client).StopContext, d)
 	defer cancel()
