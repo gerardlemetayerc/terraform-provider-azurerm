@@ -138,10 +138,7 @@ func (r UserAssignedIdentityResource) Read() sdk.ResourceFunc {
 				return err
 			}
 
-			   // Récupère l'ID de souscription depuis l'ID parsé
-			   if id.SubscriptionId != "" {
-					   metadata.ResourceData.Set("subscription_id", id.SubscriptionId)
-			   }
+			   schema.SubscriptionId = id.SubscriptionId
 			   resp, err := client.UserAssignedIdentitiesGet(ctx, *id)
 			if err != nil {
 				if response.WasNotFound(resp.HttpResponse) {
@@ -150,15 +147,14 @@ func (r UserAssignedIdentityResource) Read() sdk.ResourceFunc {
 				return fmt.Errorf("retrieving %s: %+v", *id, err)
 			}
 
-			if model := resp.Model; model != nil {
-				schema.Name = id.UserAssignedIdentityName
-				schema.ResourceGroupName = id.ResourceGroupName
-				if err := r.mapIdentityToUserAssignedIdentityResourceSchema(*model, &schema); err != nil {
-					return fmt.Errorf("flattening model: %+v", err)
-				}
-			}
-
-			return metadata.Encode(&schema)
+			   if model := resp.Model; model != nil {
+					   schema.Name = id.UserAssignedIdentityName
+					   schema.ResourceGroupName = id.ResourceGroupName
+					   if err := r.mapIdentityToUserAssignedIdentityResourceSchema(*model, &schema); err != nil {
+							   return fmt.Errorf("flattening model: %+v", err)
+					   }
+			   }
+			   return metadata.Encode(&schema)
 		},
 	}
 }
