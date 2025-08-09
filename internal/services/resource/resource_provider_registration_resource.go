@@ -31,8 +31,9 @@ var (
 type ResourceProviderRegistrationResource struct{}
 
 type ResourceProviderRegistrationModel struct {
-	Name     string                                     `tfschema:"name"`
-	Features []ResourceProviderRegistrationFeatureModel `tfschema:"feature"`
+	   Name           string                                     `tfschema:"name"`
+	   SubscriptionId string                                     `tfschema:"subscription_id"`
+	   Features       []ResourceProviderRegistrationFeatureModel  `tfschema:"feature"`
 }
 
 type ResourceProviderRegistrationFeatureModel struct {
@@ -50,33 +51,36 @@ const (
 )
 
 func (r ResourceProviderRegistrationResource) Arguments() map[string]*pluginsdk.Schema {
-	return map[string]*pluginsdk.Schema{
-		"name": {
-			Type:         pluginsdk.TypeString,
-			Required:     true,
-			ForceNew:     true,
-			ValidateFunc: resourceproviders.EnhancedValidate,
-		},
-
-		"feature": {
-			Type:     pluginsdk.TypeSet,
-			Optional: true,
-			Elem: &pluginsdk.Resource{
-				Schema: map[string]*pluginsdk.Schema{
-					"name": {
-						Type:         pluginsdk.TypeString,
-						Required:     true,
-						ValidateFunc: validation.StringIsNotEmpty,
-					},
-
-					"registered": {
-						Type:     pluginsdk.TypeBool,
-						Required: true,
-					},
-				},
-			},
-		},
-	}
+	   return map[string]*pluginsdk.Schema{
+			   "name": {
+					   Type:         pluginsdk.TypeString,
+					   Required:     true,
+					   ForceNew:     true,
+					   ValidateFunc: resourceproviders.EnhancedValidate,
+			   },
+			   "subscription_id": {
+					   Type:     pluginsdk.TypeString,
+					   Optional: true,
+					   Computed: true,
+			   },
+			   "feature": {
+					   Type:     pluginsdk.TypeSet,
+					   Optional: true,
+					   Elem: &pluginsdk.Resource{
+							   Schema: map[string]*pluginsdk.Schema{
+									   "name": {
+											   Type:         pluginsdk.TypeString,
+											   Required:     true,
+											   ValidateFunc: validation.StringIsNotEmpty,
+									   },
+									   "registered": {
+											   Type:     pluginsdk.TypeBool,
+											   Required: true,
+									   },
+							   },
+					   },
+			   },
+	   }
 }
 
 func (r ResourceProviderRegistrationResource) Attributes() map[string]*pluginsdk.Schema {
@@ -102,7 +106,11 @@ func (r ResourceProviderRegistrationResource) Create() sdk.ResourceFunc {
 				return err
 			}
 
-			resourceId := providers.NewSubscriptionProviderID(account.SubscriptionId, obj.Name)
+			   subscriptionId := obj.SubscriptionId
+			   if subscriptionId == "" {
+					   subscriptionId = account.SubscriptionId
+			   }
+			   resourceId := providers.NewSubscriptionProviderID(subscriptionId, obj.Name)
 			if err := r.checkIfManagedByTerraform(resourceId.ProviderName, account); err != nil {
 				return err
 			}
@@ -168,13 +176,17 @@ func (r ResourceProviderRegistrationResource) Update() sdk.ResourceFunc {
 				return err
 			}
 
-			resourceId, err := providers.ParseSubscriptionProviderID(metadata.ResourceData.Id())
-			if err != nil {
-				return err
-			}
-			if err := r.checkIfManagedByTerraform(resourceId.ProviderName, account); err != nil {
-				return err
-			}
+			   resourceId, err := providers.ParseSubscriptionProviderID(metadata.ResourceData.Id())
+			   if err != nil {
+					   return err
+			   }
+			   // Renseigne subscription_id dans le state si présent
+			   if resourceId.SubscriptionId != "" {
+					   metadata.ResourceData.Set("subscription_id", resourceId.SubscriptionId)
+			   }
+			   if err := r.checkIfManagedByTerraform(resourceId.ProviderName, account); err != nil {
+					   return err
+			   }
 
 			provider, err := client.Get(ctx, *resourceId, providers.DefaultGetOperationOptions())
 			if err != nil {
@@ -232,10 +244,14 @@ func (r ResourceProviderRegistrationResource) Read() sdk.ResourceFunc {
 			featureClient := metadata.Client.Resource.FeaturesClient
 			account := metadata.Client.Account
 
-			id, err := providers.ParseSubscriptionProviderID(metadata.ResourceData.Id())
-			if err != nil {
-				return err
-			}
+			   id, err := providers.ParseSubscriptionProviderID(metadata.ResourceData.Id())
+			   if err != nil {
+					   return err
+			   }
+			   // Renseigne subscription_id dans le state si présent
+			   if id.SubscriptionId != "" {
+					   metadata.ResourceData.Set("subscription_id", id.SubscriptionId)
+			   }
 
 			if err := r.checkIfManagedByTerraform(id.ProviderName, account); err != nil {
 				return err
