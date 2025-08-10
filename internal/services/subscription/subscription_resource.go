@@ -118,6 +118,13 @@ func resourceSubscription() *pluginsdk.Resource {
 			},
 
 			"tags": commonschema.Tags(),
+
+		"apply_resource_provider_registration": {
+			Type:        pluginsdk.TypeBool,
+			Optional:    true,
+			Default:     false,
+			Description: "If true, automatically applies the provider's resource provider registration strategy to the new subscription after creation.",
+		},
 		},
 	}
 }
@@ -248,6 +255,31 @@ func resourceSubscriptionCreate(d *pluginsdk.ResourceData, meta interface{}) err
 	}
 
 	d.SetId(id.ID())
+
+	// Apply resource provider registration if requested
+	if v, ok := d.GetOk("apply_resource_provider_registration"); ok && v.(bool) {
+		client := meta.(*clients.Client)
+		// Get the subscription ID
+		alias, err := aliasClient.AliasGet(ctx, id)
+		if err == nil && alias.Model != nil && alias.Model.Properties != nil && alias.Model.Properties.SubscriptionId != nil {
+			subId := commonids.NewSubscriptionID(*alias.Model.Properties.SubscriptionId)
+			// Get provider registration strategy from client
+			resourceProviderRegistrationSet := client.ProviderConfig.ResourceProviderRegistrations
+			if resourceProviderRegistrationSet == "" {
+				resourceProviderRegistrationSet = "all"
+			}
+			requiredResourceProviders, err := resourceproviders.GetResourceProvidersSet(resourceProviderRegistrationSet)
+			if err == nil {
+				log.Printf("[INFO] Enregistrement des resource providers sur la nouvelle souscription %s en cours...", subId.ID())
+				ctx2, cancel := context.WithTimeout(ctx, 30*time.Minute)
+				defer cancel()
+				err = resourceproviders.EnsureRegistered(ctx2, client.Resource.ResourceProvidersClient, subId, requiredResourceProviders)
+				if err != nil {
+					return fmt.Errorf("registering resource providers on new subscription: %w", err)
+				}
+			}
+		}
+	}
 
 	return resourceSubscriptionRead(d, meta)
 }
