@@ -111,8 +111,11 @@ func (r ResourceProviderRegistrationResource) Create() sdk.ResourceFunc {
 					   subscriptionId = account.SubscriptionId
 			   }
 			   resourceId := providers.NewSubscriptionProviderID(subscriptionId, obj.Name)
-			if err := r.checkIfManagedByTerraform(resourceId.ProviderName, account); err != nil {
-				return err
+			// Si un subscription_id est passé, on bypass la vérification car ce n'est pas géré par le provider
+			if obj.SubscriptionId == "" {
+				if err := r.checkIfManagedByTerraform(resourceId.ProviderName, account); err != nil {
+					return err
+				}
 			}
 
 			provider, err := client.Get(ctx, resourceId, providers.DefaultGetOperationOptions())
@@ -184,8 +187,11 @@ func (r ResourceProviderRegistrationResource) Update() sdk.ResourceFunc {
 			   if resourceId.SubscriptionId != "" {
 					   metadata.ResourceData.Set("subscription_id", resourceId.SubscriptionId)
 			   }
-			   if err := r.checkIfManagedByTerraform(resourceId.ProviderName, account); err != nil {
+			   // Si un subscription_id est passé, on bypass la vérification car ce n'est pas géré par le provider
+			   if obj.SubscriptionId == "" {
+				   if err := r.checkIfManagedByTerraform(resourceId.ProviderName, account); err != nil {
 					   return err
+				   }
 			   }
 
 			provider, err := client.Get(ctx, *resourceId, providers.DefaultGetOperationOptions())
@@ -253,8 +259,11 @@ func (r ResourceProviderRegistrationResource) Read() sdk.ResourceFunc {
 					   metadata.ResourceData.Set("subscription_id", id.SubscriptionId)
 			   }
 
-			if err := r.checkIfManagedByTerraform(id.ProviderName, account); err != nil {
-				return err
+			// Si un subscription_id est passé, on bypass la vérification car ce n'est pas géré par le provider
+			if id.SubscriptionId == "" {
+				if err := r.checkIfManagedByTerraform(id.ProviderName, account); err != nil {
+					return err
+				}
 			}
 
 			resp, err := client.Get(ctx, *id, providers.DefaultGetOperationOptions())
@@ -313,8 +322,11 @@ func (r ResourceProviderRegistrationResource) Delete() sdk.ResourceFunc {
 				return err
 			}
 
-			if err := r.checkIfManagedByTerraform(id.ProviderName, account); err != nil {
-				return err
+			// Si un subscription_id est passé, on bypass la vérification car ce n'est pas géré par le provider
+			if id.SubscriptionId == "" {
+				if err := r.checkIfManagedByTerraform(id.ProviderName, account); err != nil {
+					return err
+				}
 			}
 
 			err = r.applyFeatures(ctx, metadata, *id, metadata.ResourceData.Get("feature").(*pluginsdk.Set).List(), make([]interface{}, 0))
@@ -377,8 +389,11 @@ func (r ResourceProviderRegistrationResource) CustomImporter() sdk.ResourceRunFu
 			return fmt.Errorf("importing %s: Resource Provider must be registered to be imported", id.ProviderName)
 		}
 
-		if err := r.checkIfManagedByTerraform(id.ProviderName, account); err != nil {
-			return fmt.Errorf("importing %s: %+v", *id, err)
+		// Si un subscription_id est passé, on bypass la vérification car ce n'est pas géré par le provider
+		if id.SubscriptionId == "" {
+			if err := r.checkIfManagedByTerraform(id.ProviderName, account); err != nil {
+				return fmt.Errorf("importing %s: %+v", *id, err)
+			}
 		}
 
 		return nil
