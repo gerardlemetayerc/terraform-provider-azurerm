@@ -250,62 +250,73 @@ func (r ResourceProviderRegistrationResource) Read() sdk.ResourceFunc {
 			featureClient := metadata.Client.Resource.FeaturesClient
 			account := metadata.Client.Account
 
-			   id, err := providers.ParseSubscriptionProviderID(metadata.ResourceData.Id())
-			   if err != nil {
-					   return err
-			   }
-			   // Renseigne subscription_id dans le state si présent
-			   if id.SubscriptionId != "" {
-					   metadata.ResourceData.Set("subscription_id", id.SubscriptionId)
-			   }
+   id, err := providers.ParseSubscriptionProviderID(metadata.ResourceData.Id())
+   if err != nil {
+		   return err
+   }
+   // Renseigne subscription_id dans le state si présent, sinon tente de le récupérer via le provider
+   subId := id.SubscriptionId
+   if subId == "" {
+		   // Essaye de récupérer la subscription depuis le provider ARM
+		   resp, err := client.Get(ctx, *id, providers.DefaultGetOperationOptions())
+		   if err == nil && resp.Model != nil && resp.Model.Id != nil {
+				   parsedId, err := providers.ParseSubscriptionProviderID(*resp.Model.Id)
+				   if err == nil {
+						   subId = parsedId.SubscriptionId
+				   }
+		   }
+   }
+   if subId != "" {
+		   metadata.ResourceData.Set("subscription_id", subId)
+   }
 
-			// Si un subscription_id est passé, on bypass la vérification car ce n'est pas géré par le provider
-			if id.SubscriptionId == "" {
-				if err := r.checkIfManagedByTerraform(id.ProviderName, account); err != nil {
-					return err
-				}
-			}
+   // Si un subscription_id est passé, on bypass la vérification car ce n'est pas géré par le provider
+   if subId == "" {
+		   if err := r.checkIfManagedByTerraform(id.ProviderName, account); err != nil {
+				   return err
+		   }
+   }
 
-			resp, err := client.Get(ctx, *id, providers.DefaultGetOperationOptions())
-			if err != nil {
-				if response.WasNotFound(resp.HttpResponse) {
-					return metadata.MarkAsGone(id)
-				}
+   resp, err := client.Get(ctx, *id, providers.DefaultGetOperationOptions())
+   if err != nil {
+		   if response.WasNotFound(resp.HttpResponse) {
+				   return metadata.MarkAsGone(id)
+		   }
 
-				return fmt.Errorf("retrieving %s: %+v", id, err)
-			}
+		   return fmt.Errorf("retrieving %s: %+v", id, err)
+   }
 
-			registrationState := ""
-			if model := resp.Model; model != nil && model.RegistrationState != nil {
-				registrationState = *model.RegistrationState
-			}
-			if !strings.EqualFold(registrationState, "Registered") {
-				log.Printf("[WARN] %s was not registered - removing from state", id)
-				return metadata.MarkAsGone(id)
-			}
+   registrationState := ""
+   if model := resp.Model; model != nil && model.RegistrationState != nil {
+		   registrationState = *model.RegistrationState
+   }
+   if !strings.EqualFold(registrationState, "Registered") {
+		   log.Printf("[WARN] %s was not registered - removing from state", id)
+		   return metadata.MarkAsGone(id)
+   }
 
-			resourceProviderFeatureId := features.NewProviders2ID(id.SubscriptionId, id.ProviderName)
-			result, err := featureClient.ListComplete(ctx, resourceProviderFeatureId)
-			if err != nil {
-				return fmt.Errorf("retrieving features for %s: %+v", *id, err)
-			}
-			features := make([]ResourceProviderRegistrationFeatureModel, 0)
-			for _, item := range result.Items {
-				if item.Properties != nil && item.Properties.State != nil && item.Name != nil {
-					featureName := (*item.Name)[len(id.ProviderName)+1:]
-					switch *item.Properties.State {
-					case Registering, Registered:
-						features = append(features, ResourceProviderRegistrationFeatureModel{Name: featureName, Registered: true})
-					case Unregistering, Unregistered:
-						features = append(features, ResourceProviderRegistrationFeatureModel{Name: featureName, Registered: false})
-					}
-				}
-			}
+   resourceProviderFeatureId := features.NewProviders2ID(subId, id.ProviderName)
+   result, err := featureClient.ListComplete(ctx, resourceProviderFeatureId)
+   if err != nil {
+		   return fmt.Errorf("retrieving features for %s: %+v", *id, err)
+   }
+   features := make([]ResourceProviderRegistrationFeatureModel, 0)
+   for _, item := range result.Items {
+		   if item.Properties != nil && item.Properties.State != nil && item.Name != nil {
+				   featureName := (*item.Name)[len(id.ProviderName)+1:]
+				   switch *item.Properties.State {
+				   case Registering, Registered:
+						   features = append(features, ResourceProviderRegistrationFeatureModel{Name: featureName, Registered: true})
+				   case Unregistering, Unregistered:
+						   features = append(features, ResourceProviderRegistrationFeatureModel{Name: featureName, Registered: false})
+				   }
+		   }
+   }
 
-			return metadata.Encode(&ResourceProviderRegistrationModel{
-				Name:     id.ProviderName,
-				Features: features,
-			})
+   return metadata.Encode(&ResourceProviderRegistrationModel{
+		   Name:     id.ProviderName,
+		   Features: features,
+   })
 		},
 		Timeout: 5 * time.Minute,
 	}
