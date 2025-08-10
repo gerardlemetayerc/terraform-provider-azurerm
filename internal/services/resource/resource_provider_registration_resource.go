@@ -250,25 +250,24 @@ func (r ResourceProviderRegistrationResource) Read() sdk.ResourceFunc {
 			featureClient := metadata.Client.Resource.FeaturesClient
 			account := metadata.Client.Account
 
-   id, err := providers.ParseSubscriptionProviderID(metadata.ResourceData.Id())
-   if err != nil {
-		   return err
-   }
-   // Renseigne subscription_id dans le state si présent, sinon tente de le récupérer via le provider
-   subId := id.SubscriptionId
-   if subId == "" {
-		   // Essaye de récupérer la subscription depuis le provider ARM
-		   resp, err := client.Get(ctx, *id, providers.DefaultGetOperationOptions())
-		   if err == nil && resp.Model != nil && resp.Model.Id != nil {
-				   parsedId, err := providers.ParseSubscriptionProviderID(*resp.Model.Id)
-				   if err == nil {
-						   subId = parsedId.SubscriptionId
-				   }
-		   }
+   rawId := metadata.ResourceData.Id()
+   // Récupère subscription_id directement depuis l'ID (ex: /subscriptions/<id>/providers/...) 
+   subId := ""
+   parts := strings.Split(rawId, "/")
+   for i := 0; i < len(parts)-1; i++ {
+	   if parts[i] == "subscriptions" && i+1 < len(parts) {
+		   subId = parts[i+1]
+		   break
+	   }
    }
    if subId != "" {
-		   metadata.ResourceData.Set("subscription_id", subId)
+	   metadata.ResourceData.Set("subscription_id", subId)
    }
+   id, err := providers.ParseSubscriptionProviderID(rawId)
+   if err != nil {
+	   return err
+   }
+   resp, err := client.Get(ctx, *id, providers.DefaultGetOperationOptions())
 
    // Si un subscription_id est passé, on bypass la vérification car ce n'est pas géré par le provider
    if subId == "" {
@@ -276,13 +275,10 @@ func (r ResourceProviderRegistrationResource) Read() sdk.ResourceFunc {
 				   return err
 		   }
    }
-
-   resp, err := client.Get(ctx, *id, providers.DefaultGetOperationOptions())
    if err != nil {
 		   if response.WasNotFound(resp.HttpResponse) {
 				   return metadata.MarkAsGone(id)
 		   }
-
 		   return fmt.Errorf("retrieving %s: %+v", id, err)
    }
 
