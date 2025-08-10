@@ -264,12 +264,8 @@ func resourceSubscriptionCreate(d *pluginsdk.ResourceData, meta interface{}) err
 		alias, err := aliasClient.AliasGet(ctx, id)
 		if err == nil && alias.Model != nil && alias.Model.Properties != nil && alias.Model.Properties.SubscriptionId != nil {
 			subId := commonids.NewSubscriptionID(*alias.Model.Properties.SubscriptionId)
-			// Get provider registration strategy from client
-			resourceProviderRegistrationSet := client.ProviderConfig.ResourceProviderRegistrations
-			if resourceProviderRegistrationSet == "" {
-				resourceProviderRegistrationSet = "all"
-			}
-			requiredResourceProviders, err := resourceproviders.GetResourceProvidersSet(resourceProviderRegistrationSet)
+			// Utilise la valeur par défaut 'all' pour la stratégie d'enregistrement
+			requiredResourceProviders, err := resourceproviders.GetResourceProvidersSet("all")
 			if err == nil {
 				log.Printf("[INFO] Enregistrement des resource providers sur la nouvelle souscription %s en cours...", subId.ID())
 				ctx2, cancel := context.WithTimeout(ctx, 30*time.Minute)
